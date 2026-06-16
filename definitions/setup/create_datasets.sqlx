@@ -1,0 +1,29 @@
+config {
+  type: "operations",
+  name: "create_datasets"
+}
+
+CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.logic`
+OPTIONS (
+  location = "${dataform.projectConfig.defaultLocation}"
+);
+
+CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.bronze_ext`
+OPTIONS (
+  location = "${dataform.projectConfig.defaultLocation}"
+);
+
+CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.bronze`
+OPTIONS (
+  location = "${dataform.projectConfig.defaultLocation}"
+);
+
+CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.silver`
+OPTIONS (
+  location = "${dataform.projectConfig.defaultLocation}"
+);
+
+CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.gold`
+OPTIONS (
+  location = "${dataform.projectConfig.defaultLocation}"
+);
