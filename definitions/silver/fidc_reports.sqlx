@@ -1,0 +1,16 @@
+-- definitions/silver/fidc_reports.sqlx
+
+config {
+  type: "view",
+  schema: "silver",
+  name: "fidc_reports",
+  dependencies: ["bronze.cvm_fidc_reports"],
+  tags: ["silver", "silver_fidc_reports"]
+}
+
+SELECT
+  *
+
+FROM ${ref("cvm_fidc_reports")}
+WHERE cnpj_fundo IS NOT NULL
+  AND reference_date IS NOT NULL

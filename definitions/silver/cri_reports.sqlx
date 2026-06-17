@@ -1,0 +1,14 @@
+-- definitions/silver/cri_reports.sqlx
+
+config {
+  type: "view",
+  schema: "silver",
+  name: "cri_reports",
+  dependencies: ["bronze.cvm_cri_reports"],
+  tags: ["silver", "silver_cri_reports"]
+}
+SELECT
+  *
+FROM ${ref("cvm_cri_reports")}
+WHERE cnpj_emissor IS NOT NULL
+  AND reference_date IS NOT NULL
