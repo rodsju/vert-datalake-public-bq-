@@ -1,4 +1,4 @@
-// definitions/bronze/bronze.js
+// definitions/bronze/gerar_bronze.js
 
 const { tables } = ingestor_config;
 
