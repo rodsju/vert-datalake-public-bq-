@@ -34,7 +34,7 @@ tables.forEach((t) => {
     publish(name, {
       schema: "bronze",
       type: "table",
-      dependencies: ([`${name}_ext`]),
+      dependencies: [`${name}_ext`],
       tags: ["bronze", `bronze_${name}`],
       ...(Object.keys(bigquery).length ? { bigquery } : {}),
     }).query((ctx) => `
@@ -110,7 +110,7 @@ tables.forEach((t) => {
     .hasOutput(true)
     .schema("bronze")
     .tags(["bronze", `bronze_${name}`])
-    .dependencies([`${name}_ext`])
+    .dependencies([`register_pending_files_${name}`])
     .queries((ctx) => {
       const renderedDeleteSql = replaceByKeys
         ? `
@@ -151,12 +151,12 @@ IF (SELECT COUNT(*) FROM pending_files) > 0 THEN
 
   CREATE TEMP TABLE staged_data AS
   SELECT
-    *,
+    ext.*,
     pf.file_prefix AS file_prefix,
     _FILE_NAME AS _source_gcs_uri,
     REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file,
     CURRENT_TIMESTAMP() AS _processed_at
-  FROM \`${ctx.database()}.bronze_ext.ext_${name}\` ext
+  FROM \`${ctx.database()}.bronze_ext.${name}_full\` ext
   JOIN pending_files pf
     ON ext._FILE_NAME = pf.gcs_uri;
 
