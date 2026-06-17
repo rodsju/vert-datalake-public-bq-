@@ -40,7 +40,7 @@ tables.forEach((t) => {
     }).query((ctx) => `
       SELECT
         *,
-        REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)__[0-9]{8}T[0-9]{6}Z\\.parquet$') AS _file_prefix,
+        REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)__[0-9]{8}T[0-9]{6}Z\\.parquet$') AS file_prefix,
         _FILE_NAME AS _source_gcs_uri,
         REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file,
         CURRENT_TIMESTAMP() AS _processed_at
@@ -54,7 +54,7 @@ tables.forEach((t) => {
    * MODO 2: file_incremental
    *
    * Processa apenas arquivos PENDING em logic.file_ingestion.
-   * Para tabelas normais: substitui por _file_prefix.
+   * Para tabelas normais: substitui por file_prefix.
    * Para tabelas com dedup + replaceByKeys: substitui por chave lógica.
    */
   const keys = t.keys || [];
@@ -99,8 +99,8 @@ tables.forEach((t) => {
 
     return `
       DELETE FROM \`${"${ctx.database()}"}.bronze.${name}\`
-      WHERE _file_prefix IN (
-        SELECT DISTINCT _file_prefix
+      WHERE file_prefix IN (
+        SELECT DISTINCT file_prefix
         FROM final_data
       );
     `;
@@ -123,8 +123,8 @@ tables.forEach((t) => {
         `
         : `
     DELETE FROM \`${ctx.database()}.bronze.${name}\`
-    WHERE _file_prefix IN (
-      SELECT DISTINCT _file_prefix
+    WHERE file_prefix IN (
+      SELECT DISTINCT file_prefix
       FROM final_data
     );
         `;
@@ -152,7 +152,7 @@ IF (SELECT COUNT(*) FROM pending_files) > 0 THEN
   CREATE TEMP TABLE staged_data AS
   SELECT
     *,
-    pf.file_prefix AS _file_prefix,
+    pf.file_prefix AS file_prefix,
     _FILE_NAME AS _source_gcs_uri,
     REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file,
     CURRENT_TIMESTAMP() AS _processed_at
@@ -193,7 +193,7 @@ ${renderedDeleteSql}
     AND status = 'PROCESSED'
     AND is_active = TRUE
     AND file_prefix IN (
-      SELECT DISTINCT _file_prefix
+      SELECT DISTINCT file_prefix
       FROM final_data
     );
 
