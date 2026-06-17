@@ -1,0 +1,47 @@
+-- definitions/silver/regulations.sqlx
+
+config {
+  type: "table",
+  schema: "silver",
+  name: "regulations",
+  bigquery: {
+    clusterBy: ["cnpj_fundo"]
+  },
+  assertions: {
+    uniqueKey: ["cnpj_fundo", "source"],
+    nonNull: ["cnpj_fundo", "document_url"]
+  },
+  tags: ["silver", "silver_regulations"]
+}
+
+SELECT
+  REGEXP_REPLACE(cnpj_fundo, r'[^0-9]', '') AS cnpj_fundo,
+  TRIM(fund_name) AS fund_name,
+
+  'CVM_DADOS_ABERTOS' AS source,
+  'ENCONTRADO' AS status,
+
+  link_arq AS document_url,
+  DATE(dt_receb) AS document_date,
+  TRIM(nm_arq) AS document_title,
+  TRIM(tp_doc) AS document_type,
+
+  file_prefix,
+  _source_gcs_uri,
+  _source_file,
+  _processed_at AS bronze_processed_at,
+  CURRENT_TIMESTAMP() AS processed_at
+
+FROM ${ref("cvm_fi_docs_eventual")}
+
+WHERE cnpj_fundo IS NOT NULL
+  AND link_arq IS NOT NULL
+  AND UPPER(tp_doc) LIKE '%REGUL%'
+
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY REGEXP_REPLACE(cnpj_fundo, r'[^0-9]', '')
+  ORDER BY
+    dt_receb DESC NULLS LAST,
+    _processed_at DESC,
+    _source_gcs_uri DESC
+) = 1

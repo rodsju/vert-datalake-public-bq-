@@ -1,0 +1,27 @@
+-- definitions/silver/sre_offerings.sqlx
+
+config { 
+    type: "view", 
+    schema: "silver", 
+    name: "sre_offerings", 
+    dependencies: ["bronze.cvm_sre_offerings"],
+    tags: ["silver","silver_sre_offerings"] 
+}
+
+SELECT
+  source,
+  numero_processo,
+  tipo_ativo,
+  cnpj_emissor,                                       -- já normalizado
+  nome_emissor, nome_lider, status,                   -- já trim + nan→NULL
+  COALESCE(data_inicio_oferta, data_emissao) AS data_registro,  -- derivado
+  data_emissao, data_vencimento, valor_total,
+  agente_fiduciario, escriturador, custodiante, administrador,
+  source AS instrucao,                                -- instrução = a fonte (icvm400/res160)
+  tipo_oferta, modalidade_oferta, rito_oferta, classe_ativo,
+  data_inicio_oferta, data_encerramento_oferta,
+  nr_emissao, serie, especie_ativo,
+  quantidade_total, preco_unitario,
+  atualizacao_monetaria, juros, cnpj_lider, gestor
+FROM ${ref("cvm_sre_offerings")}
+WHERE cnpj_emissor IS NOT NULL

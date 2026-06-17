@@ -27,6 +27,11 @@ const tables = [
             mode: "snapshot",
             clusterBy: ["cnpj_fundo"],
         },
+        {
+            name: "cvm_fi_docs_eventual",
+            mode: "file_incremental",
+            clusterBy: ["cnpj_fundo"],
+        },
         { 
             name: "cvm_debenture_offers",
             mode: "snapshot",

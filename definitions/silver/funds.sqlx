@@ -1,0 +1,41 @@
+-- definitions/silver/funds.sqlx
+
+config {
+  type: "table",
+  schema: "silver",
+  name: "funds",
+  bigquery: {
+    clusterBy: ["cnpj_fundo"]
+  },
+  assertions: {
+    uniqueKey: ["cnpj_fundo"],
+    nonNull: ["cnpj_fundo"]
+  },
+  tags: ["silver", "silver_funds"]
+}
+
+SELECT
+  cnpj_fundo,
+  denom_social AS name,
+  tp_fundo AS type,
+  admin AS administrator,
+  gestor AS manager,
+  custodiante AS custodian,
+  COALESCE(sit, 'EM FUNCIONAMENTO NORMAL') AS status,
+  dt_ini_ativ AS data_constituicao,
+
+  file_prefix,
+  _source_gcs_uri,
+  _source_file,
+  _processed_at AS bronze_processed_at,
+  CURRENT_TIMESTAMP() AS updated_at
+
+FROM ${ref("cvm_fi_cadastral")}
+WHERE cnpj_fundo IS NOT NULL
+
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY cnpj_fundo
+  ORDER BY
+    _processed_at DESC,
+    _source_gcs_uri DESC
+) = 1

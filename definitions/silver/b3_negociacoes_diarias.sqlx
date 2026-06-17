@@ -1,0 +1,50 @@
+-- definitions/silver/b3_negociacoes_diarias.sqlx
+
+config {
+  type: "table",
+  schema: "silver",
+  name: "b3_negociacoes_diarias",
+  bigquery: {
+    partitionBy: "data_referencia",
+    clusterBy: ["codigo_if", "tipo_instrumento"]
+  },
+  assertions: {
+    uniqueKey: ["data_referencia", "codigo_if", "tipo_instrumento"],
+    nonNull: ["data_referencia", "codigo_if"]
+  },
+  tags: ["silver", "silver_b3_negociacoes_diarias"]
+}
+
+SELECT
+  data_referencia,
+  codigo_if,
+  tipo_instrumento,
+
+  ANY_VALUE(emissor) AS emissor,
+
+  COUNT(*) AS quantidade_negocios,
+  SUM(quantidade) AS quantidade_total,
+  SUM(volume) AS volume_total,
+
+  MIN(preco) AS preco_minimo,
+  MAX(preco) AS preco_maximo,
+
+  COALESCE(
+    SAFE_DIVIDE(SUM(preco * quantidade), SUM(quantidade)),
+    AVG(preco)
+  ) AS preco_medio,
+
+  MIN(taxa) AS taxa_minima,
+  MAX(taxa) AS taxa_maxima,
+  AVG(taxa) AS taxa_media,
+
+  CURRENT_TIMESTAMP() AS processed_at
+
+FROM ${ref("b3_negociacoes")}
+
+WHERE COALESCE(UPPER(TRIM(situacao)), '') != 'CANCELADO'
+
+GROUP BY
+  data_referencia,
+  codigo_if,
+  tipo_instrumento
