@@ -34,6 +34,7 @@ tables.forEach((t) => {
     publish(name, {
       schema: "bronze",
       type: "table",
+      dependencies: ([`${name}_ext`]),
       tags: ["bronze", `bronze_${name}`],
       ...(Object.keys(bigquery).length ? { bigquery } : {}),
     }).query((ctx) => `
