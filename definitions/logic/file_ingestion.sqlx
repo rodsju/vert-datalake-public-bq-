@@ -1,0 +1,23 @@
+config {
+  type: "operations",
+  schema: "logic",
+  name: "file_ingestion",
+  hasOutput: true,
+  tags: ["setup", "logic", "file_ingestion"],
+  dependencies: ["create_datasets"]
+}
+
+CREATE TABLE IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.logic.file_ingestion` (
+  source_table STRING,
+  gcs_uri STRING,
+  file_name STRING,
+  file_prefix STRING,
+  status STRING, -- PENDING, PROCESSED, REPLACED, FAILED
+  is_active BOOL,
+  row_count INT64,
+  created_at TIMESTAMP,
+  processed_at TIMESTAMP,
+  replaced_at TIMESTAMP
+)
+PARTITION BY DATE(processed_at)
+CLUSTER BY source_table, status;
