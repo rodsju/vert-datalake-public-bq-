@@ -46,8 +46,8 @@ const tables = [
         {
             name: "b3_negociacoes",
             mode: "file_incremental",
-            partitionBy: "DATE(data_pregao)",
-            clusterBy: ["ticker"],
+            partitionBy: "PARTITION BY DATE_TRUNC(data_referencia, YEAR)",
+            clusterBy: ["codigo_isin"],
         },
 
         {
