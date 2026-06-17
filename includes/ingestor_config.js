@@ -2,16 +2,53 @@ const BUCKET = "gs://vert-dev-datalake-public-raw";
 const PREFIX = "ingestor";
 
 const tables = [
-        { name: "cvm_fidc_reports" },
-        { name: "cvm_cri_reports" },
-        { name: "cvm_cra_reports" },
-        { name: "cvm_fi_holdings" },
-        { name: "cvm_fi_cadastral" },
-        { name: "cvm_debenture_offers" },
-        { name: "cvm_sre_offerings" },
-        { name: "cvm_dfin_docs" },
-        { name: "cvm_fi_docs_eventual" },
-        { name: "b3_negociacoes" },
+        { 
+            name: "cvm_fidc_reports",
+            mode: "file_incremental",
+            clusterBy: ["cnpj"],
+        },
+        { 
+            name: "cvm_cri_reports",
+            mode: "file_incremental",
+            clusterBy: ["cnpj_emissor","nr_emissao"],
+        },
+        { 
+            name: "cvm_cra_reports",
+            mode: "file_incremental",
+            clusterBy: ["cnpj_emissor","nr_emissao"],
+        },
+        {
+            name: "cvm_fi_holdings",
+            mode: "file_incremental",
+            clusterBy: ["cnpj_fundo"],
+        },
+        { 
+            name: "cvm_fi_cadastral",
+            mode: "snapshot",
+            clusterBy: ["cnpj_fundo"],
+        },
+        { 
+            name: "cvm_debenture_offers",
+            mode: "snapshot",
+            clusterBy: ["cnpj_emissor","nr_emissao"],
+        },
+        { 
+            name: "cvm_sre_offerings",
+            mode: "snapshot",
+            clusterBy: ["cnpj_emissor","nr_emissao"],
+        },
+        { 
+            name: "cvm_dfin_docs",
+            mode: "file_incremental",
+            clusterBy: ["cnpj_emissor","nr_emissao"],
+        },
+        //{ name: "cvm_fi_docs_eventual" },
+        {
+            name: "b3_negociacoes",
+            mode: "file_incremental",
+            partitionBy: "DATE(data_pregao)",
+            clusterBy: ["ticker"],
+        },
 
         {
             name: "fnet_documentos",
