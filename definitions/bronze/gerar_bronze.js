@@ -25,7 +25,7 @@ tables.forEach((t) => {
   }
 
   /**
-   * MODO 1: snapshot
+   * MODO 1: snapshot - 
    *
    * Recria a bronze inteira sempre.
    * Bom para tabelas pequenas ou snapshots oficiais.
