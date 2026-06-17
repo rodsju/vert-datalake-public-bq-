@@ -6,6 +6,16 @@ tables.forEach((t) => {
   const name = t.name;
   const mode = t.mode || "snapshot";
 
+  const exceptColumns = t.exceptColumns || ["raw_data"];
+
+  const selectStar = exceptColumns.length
+    ? `* EXCEPT(${exceptColumns.map((c) => `\`${c}\``).join(", ")})`
+    : "*";
+
+  const extSelectStar = exceptColumns.length
+    ? `ext.* EXCEPT(${exceptColumns.map((c) => `\`${c}\``).join(", ")})`
+    : "ext.*";
+
   const tablePartitionClause = t.partitionBy
     ? `\nPARTITION BY ${t.partitionBy}`
     : "";
@@ -39,7 +49,7 @@ tables.forEach((t) => {
       ...(Object.keys(bigquery).length ? { bigquery } : {}),
     }).query((ctx) => `
       SELECT
-        *,
+        ${selectStar},
         REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)__[0-9]{8}T[0-9]{6}Z\\.parquet$') AS file_prefix,
         _FILE_NAME AS _source_gcs_uri,
         REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file,
@@ -151,7 +161,7 @@ IF (SELECT COUNT(*) FROM pending_files) > 0 THEN
 
   CREATE TEMP TABLE staged_data AS
   SELECT
-    ext.*,
+    ${extSelectStar},
     pf.file_prefix AS file_prefix,
     _FILE_NAME AS _source_gcs_uri,
     REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file,

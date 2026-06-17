@@ -5,7 +5,7 @@ const tables = [
         { 
             name: "cvm_fidc_reports",
             mode: "file_incremental",
-            clusterBy: ["cnpj"],
+            clusterBy: ["cnpj_fundo"],
         },
         { 
             name: "cvm_cri_reports",
