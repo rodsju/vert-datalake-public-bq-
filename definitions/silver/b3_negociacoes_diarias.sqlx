@@ -12,6 +12,7 @@ config {
     uniqueKey: ["data_referencia", "codigo_if", "tipo_instrumento"],
     nonNull: ["data_referencia", "codigo_if"]
   },
+  dependencies: ["bronze.b3_negociacoes"],
   tags: ["silver", "silver_b3_negociacoes_diarias"]
 }
 

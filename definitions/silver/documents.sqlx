@@ -11,6 +11,7 @@ config {
     uniqueKey: ["source", "id_externo"],
     nonNull: ["source", "id_externo"]
   },
+  dependencies: ["bronze.fnet_documentos","bronze.cvm_dfin_docs"],
   tags: ["silver", "silver_documents"]
 }
 

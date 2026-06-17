@@ -11,6 +11,7 @@ config {
     uniqueKey: ["cnpj_fundo"],
     nonNull: ["cnpj_fundo"]
   },
+  dependencies: ["bronze.cvm_fi_cadastral"],
   tags: ["silver", "silver_funds"]
 }
 

@@ -11,6 +11,7 @@ config {
     uniqueKey: ["cnpj_fundo", "source"],
     nonNull: ["cnpj_fundo", "document_url"]
   },
+  dependencies: ["bronze.cvm_fi_docs_eventual"],
   tags: ["silver", "silver_regulations"]
 }
 
