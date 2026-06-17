@@ -1,0 +1,112 @@
+-- definitions/silver/documents.sqlx
+
+config {
+  type: "table",
+  schema: "silver",
+  name: "documents",
+  bigquery: {
+    clusterBy: ["source", "cnpj_fundo"]
+  },
+  assertions: {
+    uniqueKey: ["source", "id_externo"],
+    nonNull: ["source", "id_externo"]
+  },
+  tags: ["silver", "silver_documents"]
+}
+
+WITH dfin AS (
+  SELECT
+    'CVM_DFIN' AS source,
+
+    CONCAT(
+      'DFIN:',
+      COALESCE(CAST(tipo_ativo AS STRING), ''),
+      ':',
+      COALESCE(CAST(nr_emissao AS STRING), '')
+    ) AS id_externo,
+
+    tipo_ativo,
+
+    CAST(NULL AS STRING) AS cnpj_fundo,
+
+    REGEXP_REPLACE(cnpj_emissor, r'[^0-9]', '') AS cnpj_emissor,
+    TRIM(nome_emissor) AS nome_emissor,
+
+    CAST(nr_emissao AS STRING) AS codigo_identificacao,
+    TRIM(nome_certificado) AS nome_certificado,
+
+    DATE(data_referencia) AS data_referencia,
+    data_entrega,
+    versao,
+
+    'DFIN' AS categoria,
+    CAST(NULL AS STRING) AS tipo_documento,
+    CAST(NULL AS STRING) AS especie,
+    CAST(NULL AS STRING) AS status,
+
+    link_download AS url_documento,
+    parecer_auditor,
+
+    file_prefix,
+    _source_gcs_uri,
+    _source_file,
+    _processed_at AS bronze_processed_at
+
+  FROM ${ref("cvm_dfin_docs")}
+
+  WHERE nr_emissao IS NOT NULL
+
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY tipo_ativo, nr_emissao
+    ORDER BY
+      data_entrega DESC NULLS LAST,
+      versao DESC NULLS LAST,
+      _processed_at DESC,
+      _source_gcs_uri DESC
+  ) = 1
+),
+
+fnet AS (
+  SELECT
+    source,
+    CAST(id_externo AS STRING) AS id_externo,
+    tipo_ativo,
+
+    REGEXP_REPLACE(cnpj_fundo, r'[^0-9]', '') AS cnpj_fundo,
+    REGEXP_REPLACE(cnpj_emissor, r'[^0-9]', '') AS cnpj_emissor,
+
+    CAST(NULL AS STRING) AS nome_emissor,
+
+    codigo_identificacao,
+    nome_certificado,
+
+    DATE(data_referencia) AS data_referencia,
+    data_entrega,
+    CAST(NULL AS INT64) AS versao,
+
+    categoria,
+    tipo_documento,
+    especie,
+    status,
+
+    url_documento,
+    CAST(NULL AS STRING) AS parecer_auditor,
+
+    file_prefix,
+    _source_gcs_uri,
+    _source_file,
+    _processed_at AS bronze_processed_at
+
+  FROM ${ref("fnet_documentos")}
+
+  WHERE id_externo IS NOT NULL
+)
+
+SELECT
+  *,
+  CURRENT_TIMESTAMP() AS processed_at
+FROM (
+  SELECT * FROM dfin
+  UNION ALL
+  SELECT * FROM fnet
+)
