@@ -1,0 +1,53 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "fidc_top_admins",
+  bigquery: {
+    partitionBy: "reference_date",
+    clusterBy: ["rank"]
+  },
+  assertions: {
+    uniqueKey: ["reference_date", "administrador"],
+    nonNull: ["reference_date", "administrador"]
+  },
+  dependencies: ["fidc_reports"],
+  tags: ["gold", "gold_fidc_top_admins"]
+}
+
+WITH admin_agg AS (
+  SELECT
+    reference_date,
+
+    TRIM(COALESCE(administrador, 'Não informado')) AS administrador,
+
+    COUNT(DISTINCT cnpj_fundo) AS fund_count,
+    SUM(patrimonio_liquido) AS total_pl,
+    AVG(patrimonio_liquido) AS avg_pl
+
+  FROM ${ref("fidc_reports")}
+
+  WHERE patrimonio_liquido > 0
+    AND reference_date IS NOT NULL
+    AND cnpj_fundo IS NOT NULL
+
+  GROUP BY
+    reference_date,
+    administrador
+)
+
+SELECT
+  reference_date,
+  administrador,
+
+  fund_count,
+  total_pl,
+  avg_pl,
+
+  ROW_NUMBER() OVER (
+    PARTITION BY reference_date
+    ORDER BY total_pl DESC
+  ) AS rank,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM admin_agg

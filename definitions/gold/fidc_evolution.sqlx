@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "fidc_evolution",
+  bigquery: {
+    partitionBy: "reference_date"
+  },
+  assertions: {
+    uniqueKey: ["reference_date"],
+    nonNull: ["reference_date"]
+  },
+  dependencies: ["fidc_reports"],
+  tags: ["gold", "gold_fidc_evolution"]
+}
+
+SELECT
+  reference_date,
+
+  COUNT(DISTINCT cnpj_fundo) AS total_funds,
+  SUM(patrimonio_liquido) AS total_pl,
+  AVG(patrimonio_liquido) AS avg_pl,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM ${ref("fidc_reports")}
+
+WHERE patrimonio_liquido > 0
+  AND reference_date IS NOT NULL
+  AND cnpj_fundo IS NOT NULL
+
+GROUP BY
+  reference_date

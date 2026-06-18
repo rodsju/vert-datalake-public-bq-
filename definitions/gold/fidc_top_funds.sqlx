@@ -1,0 +1,41 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "fidc_top_funds",
+  bigquery: {
+    partitionBy: "reference_date",
+    clusterBy: ["rank"]
+  },
+  assertions: {
+    uniqueKey: ["reference_date", "cnpj_fundo"],
+    nonNull: ["reference_date", "cnpj_fundo"]
+  },
+  dependencies: ["fidc_reports"],
+  tags: ["gold", "gold_fidc_top_funds"]
+}
+
+SELECT
+  reference_date,
+
+  cnpj_fundo,
+  fund_name,
+  COALESCE(NULLIF(TRIM(classe), ''), 'Não classificado') AS segment,
+
+  patrimonio_liquido,
+
+  TRIM(COALESCE(administrador, 'Não informado')) AS administrador,
+
+  ROW_NUMBER() OVER (
+    PARTITION BY reference_date
+    ORDER BY patrimonio_liquido DESC
+  ) AS rank,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM ${ref("fidc_reports")}
+
+WHERE patrimonio_liquido > 0
+  AND reference_date IS NOT NULL
+  AND cnpj_fundo IS NOT NULL
+
+QUALIFY rank <= 100  

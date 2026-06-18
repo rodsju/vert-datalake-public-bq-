@@ -1,0 +1,36 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "fidc_segment_evolution",
+  bigquery: {
+    partitionBy: "reference_date",
+    clusterBy: ["segment"]
+  },
+  assertions: {
+    uniqueKey: ["reference_date", "segment"],
+    nonNull: ["reference_date", "segment"]
+  },
+  dependencies: ["fidc_reports"],
+  tags: ["gold", "gold_fidc_segment_evolution"]
+}
+
+SELECT
+  reference_date,
+
+  COALESCE(NULLIF(TRIM(classe), ''), 'Não classificado') AS segment,
+
+  COUNT(DISTINCT cnpj_fundo) AS fund_count,
+  SUM(patrimonio_liquido) AS total_pl,
+  AVG(patrimonio_liquido) AS avg_pl,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM ${ref("fidc_reports")}
+
+WHERE patrimonio_liquido > 0
+  AND reference_date IS NOT NULL
+  AND cnpj_fundo IS NOT NULL
+
+GROUP BY
+  reference_date,
+  segment

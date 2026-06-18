@@ -1,0 +1,122 @@
+-- definitions/silver/debenture_offers.sqlx
+
+config {
+  type: "table",
+  schema: "silver",
+  name: "debenture_offers",
+  bigquery: {
+    clusterBy: ["cnpj_emissor"]
+  },
+  assertions: {
+    uniqueKey: ["cnpj_emissor", "nr_emissao", "serie"],
+    nonNull: ["cnpj_emissor", "nr_emissao", "serie"]
+  },
+  dependencies: ["cvm_debenture_offers"],
+  tags: ["silver", "silver_debenture_offers"]
+}
+
+WITH unified AS (
+
+  -- prio 0: fonte preferida, debêntures direto
+  SELECT
+    REGEXP_REPLACE(cnpj_emissor, r'[^0-9]', '') AS cnpj_emissor,
+    TRIM(nome_emissor) AS nome_emissor,
+
+    CAST(nr_emissao AS STRING) AS nr_emissao,
+    CAST(serie AS STRING) AS serie,
+
+    DATE(data_emissao) AS data_emissao,
+    DATE(data_vencimento) AS data_vencimento,
+
+    valor_emissao,
+    valor_unitario,
+    quantidade,
+
+    tipo_remuneracao,
+    taxa_remuneracao,
+    indexador,
+    spread,
+
+    garantia,
+    especie,
+    coordenador_lider,
+    status,
+    modalidade_oferta,
+
+    'CVM_DEBENTURE_OFFERS' AS source,
+    0 AS prio,
+
+    file_prefix,
+    _source_gcs_uri,
+    _source_file,
+    _processed_at AS bronze_processed_at
+
+  FROM ${ref("cvm_debenture_offers")}
+
+  WHERE cnpj_emissor IS NOT NULL
+    AND nr_emissao IS NOT NULL
+    AND serie IS NOT NULL
+
+
+  UNION ALL
+
+
+  -- prio 1: debêntures que aparecem no SRE
+  SELECT
+    REGEXP_REPLACE(cnpj_emissor, r'[^0-9]', '') AS cnpj_emissor,
+    TRIM(nome_emissor) AS nome_emissor,
+
+    CAST(nr_emissao AS STRING) AS nr_emissao,
+    CAST(serie AS STRING) AS serie,
+
+    DATE(COALESCE(data_emissao, data_inicio_oferta)) AS data_emissao,
+    DATE(data_vencimento) AS data_vencimento,
+
+    valor_total AS valor_emissao,
+    preco_unitario AS valor_unitario,
+    CAST(ROUND(quantidade_total) AS INT64) AS quantidade,
+
+    tipo_ativo AS tipo_remuneracao,
+    juros AS taxa_remuneracao,
+    atualizacao_monetaria AS indexador,
+    CAST(NULL AS NUMERIC) AS spread,
+
+    CAST(NULL AS STRING) AS garantia,
+    especie_ativo AS especie,
+    nome_lider AS coordenador_lider,
+    status,
+    modalidade_oferta,
+
+    'CVM_SRE_OFFERINGS' AS source,
+    1 AS prio,
+
+    file_prefix,
+    _source_gcs_uri,
+    _source_file,
+    _processed_at AS bronze_processed_at
+
+  FROM ${ref("cvm_sre_offerings")}
+
+  WHERE cnpj_emissor IS NOT NULL
+    AND nr_emissao IS NOT NULL
+    AND serie IS NOT NULL
+    AND UPPER(tipo_ativo) LIKE '%DEBEN%'
+)
+
+SELECT
+  * EXCEPT(prio, nome_emissor),
+
+  COALESCE(NULLIF(nome_emissor, ''), 'Desconhecido') AS nome_emissor,
+
+  CURRENT_TIMESTAMP() AS processed_at
+
+FROM unified
+
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY cnpj_emissor, nr_emissao, serie
+  ORDER BY
+    prio,
+    data_emissao DESC NULLS LAST,
+    bronze_processed_at DESC,
+    _source_gcs_uri DESC
+) = 1

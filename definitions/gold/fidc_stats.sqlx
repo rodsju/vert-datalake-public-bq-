@@ -1,0 +1,42 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "fidc_stats",
+  assertions: {
+    uniqueKey: ["reference_date"],
+    nonNull: ["reference_date"]
+  },
+  dependencies: ["fidc_reports"],
+  tags: ["gold", "gold_fidc_stats"]
+}
+
+WITH latest AS (
+  SELECT
+    MAX(reference_date) AS reference_date
+  FROM ${ref("fidc_reports")}
+  WHERE patrimonio_liquido > 0
+    AND reference_date IS NOT NULL
+)
+
+SELECT
+  r.reference_date,
+
+  COUNT(DISTINCT r.cnpj_fundo) AS total_funds,
+  SUM(r.patrimonio_liquido) AS total_pl,
+  AVG(r.patrimonio_liquido) AS avg_pl,
+
+  MIN(r.patrimonio_liquido) AS min_pl,
+  MAX(r.patrimonio_liquido) AS max_pl,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM ${ref("fidc_reports")} r
+
+JOIN latest l
+  ON r.reference_date = l.reference_date
+
+WHERE r.patrimonio_liquido > 0
+  AND r.cnpj_fundo IS NOT NULL
+
+GROUP BY
+  r.reference_date
