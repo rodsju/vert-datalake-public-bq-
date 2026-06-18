@@ -1,0 +1,25 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "debenture_evolution",
+  assertions: {
+    uniqueKey: ["year"],
+    nonNull: ["year"]
+  },
+  dependencies: ["debenture_offers"],
+  tags: ["gold", "gold_debenture_evolution"]
+}
+
+SELECT
+  EXTRACT(YEAR FROM data_emissao) AS year,
+
+  COUNT(*) AS offer_count,
+  SUM(valor_emissao) AS total_volume,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM ${ref("debenture_offers")}
+
+WHERE data_emissao IS NOT NULL
+
+GROUP BY year

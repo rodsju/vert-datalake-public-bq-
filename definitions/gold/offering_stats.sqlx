@@ -1,0 +1,48 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "offering_stats",
+  dependencies: ["sre_offerings"],
+  tags: ["gold", "gold_offering_stats"]
+}
+
+WITH base AS (
+  SELECT *
+  FROM ${ref("sre_offerings")}
+)
+
+SELECT
+  COUNT(*) AS total_offerings,
+  SUM(valor_total) AS total_volume,
+
+  ARRAY(
+    SELECT AS STRUCT
+      COALESCE(tipo_ativo, 'N/A') AS key,
+      COUNT(*) AS n
+    FROM base
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_type,
+
+  ARRAY(
+    SELECT AS STRUCT
+      CAST(EXTRACT(YEAR FROM data_emissao) AS STRING) AS key,
+      COUNT(*) AS n
+    FROM base
+    WHERE data_emissao IS NOT NULL
+    GROUP BY key
+    ORDER BY key DESC
+  ) AS by_year,
+
+  ARRAY(
+    SELECT AS STRUCT
+      COALESCE(modalidade_oferta, 'N/A') AS key,
+      COUNT(*) AS n
+    FROM base
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_modalidade,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM base

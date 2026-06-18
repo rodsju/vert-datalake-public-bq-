@@ -1,0 +1,48 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "debenture_stats",
+  dependencies: ["debenture_offers"],
+  tags: ["gold", "gold_debenture_stats"]
+}
+
+WITH base AS (
+  SELECT *
+  FROM ${ref("debenture_offers")}
+)
+
+SELECT
+  COUNT(*) AS total_offers,
+  SUM(valor_emissao) AS total_volume,
+
+  ARRAY(
+    SELECT AS STRUCT
+      nome_emissor AS key,
+      COUNT(*) AS n
+    FROM base
+    WHERE nome_emissor IS NOT NULL
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_issuer,
+
+  ARRAY(
+    SELECT AS STRUCT
+      COALESCE(tipo_remuneracao, 'N/A') AS key,
+      COUNT(*) AS n
+    FROM base
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_remuneration,
+
+  ARRAY(
+    SELECT AS STRUCT
+      COALESCE(especie, 'N/A') AS key,
+      COUNT(*) AS n
+    FROM base
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_species,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM base

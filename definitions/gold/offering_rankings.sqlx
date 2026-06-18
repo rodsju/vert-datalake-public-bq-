@@ -1,0 +1,86 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "offering_rankings",
+  bigquery: {
+    clusterBy: ["role", "rank"]
+  },
+  assertions: {
+    uniqueKey: ["role", "name"]
+  },
+  dependencies: ["sre_offerings"],
+  tags: ["gold", "gold_offering_rankings"]
+}
+
+WITH agg AS (
+
+  SELECT
+    'Líder' AS role,
+    nome_lider AS name,
+    COUNT(*) AS count,
+    SUM(valor_total) AS volume
+  FROM ${ref("sre_offerings")}
+  WHERE nome_lider IS NOT NULL
+  GROUP BY name
+
+  UNION ALL
+
+  SELECT
+    'Fiduciário' AS role,
+    agente_fiduciario AS name,
+    COUNT(*) AS count,
+    SUM(valor_total) AS volume
+  FROM ${ref("sre_offerings")}
+  WHERE agente_fiduciario IS NOT NULL
+  GROUP BY name
+
+  UNION ALL
+
+  SELECT
+    'Escriturador' AS role,
+    escriturador AS name,
+    COUNT(*) AS count,
+    SUM(valor_total) AS volume
+  FROM ${ref("sre_offerings")}
+  WHERE escriturador IS NOT NULL
+  GROUP BY name
+
+  UNION ALL
+
+  SELECT
+    'Custodiante' AS role,
+    custodiante AS name,
+    COUNT(*) AS count,
+    SUM(valor_total) AS volume
+  FROM ${ref("sre_offerings")}
+  WHERE custodiante IS NOT NULL
+  GROUP BY name
+
+  UNION ALL
+
+  SELECT
+    'Administrador' AS role,
+    administrador AS name,
+    COUNT(*) AS count,
+    SUM(valor_total) AS volume
+  FROM ${ref("sre_offerings")}
+  WHERE administrador IS NOT NULL
+  GROUP BY name
+)
+
+SELECT
+  role,
+  name,
+  count,
+  volume,
+
+  ROW_NUMBER() OVER (
+    PARTITION BY role
+    ORDER BY volume DESC
+  ) AS rank,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM agg
+
+WHERE name IS NOT NULL

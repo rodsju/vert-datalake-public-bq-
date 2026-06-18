@@ -1,0 +1,48 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "cri_evolution",
+  bigquery: {
+    partitionBy: "reference_date"
+  },
+  assertions: {
+    uniqueKey: ["reference_date"],
+    nonNull: ["reference_date"]
+  },
+  dependencies: ["cri_reports"],
+  tags: ["gold", "gold_cri_evolution"]
+}
+
+WITH base AS (
+  SELECT
+    reference_date,
+    SUM(vl_saldo) AS total_saldo,
+    COUNT(DISTINCT CONCAT(
+      COALESCE(CAST(cnpj_emissor AS STRING), ''),
+      '-',
+      COALESCE(CAST(nr_emissao AS STRING), ''),
+      '-',
+      COALESCE(CAST(nr_serie AS STRING), '')
+    )) AS total_cris
+  FROM ${ref("cri_reports")}
+  WHERE vl_saldo > 0
+    AND reference_date IS NOT NULL
+  GROUP BY reference_date
+)
+
+SELECT
+  reference_date,
+  total_saldo,
+  total_cris,
+
+  COALESCE(
+    total_cris < 0.70 * AVG(total_cris) OVER (
+      ORDER BY reference_date
+      ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
+    ),
+    FALSE
+  ) AS is_provisional,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM base

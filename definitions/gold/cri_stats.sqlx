@@ -1,0 +1,73 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "cri_stats",
+  assertions: {
+    uniqueKey: ["reference_date"],
+    nonNull: ["reference_date"]
+  },
+  dependencies: ["cri_reports", "cri_evolution"],
+  tags: ["gold", "gold_cri_stats"]
+}
+
+WITH latest AS (
+  SELECT
+    reference_date
+  FROM ${ref("cri_evolution")}
+  WHERE NOT COALESCE(is_provisional, FALSE)
+  ORDER BY reference_date DESC
+  LIMIT 1
+),
+
+base AS (
+  SELECT *
+  FROM ${ref("cri_reports")}
+  WHERE vl_saldo > 0
+    AND reference_date = (SELECT reference_date FROM latest)
+)
+
+SELECT
+  (SELECT reference_date FROM latest) AS reference_date,
+
+  COUNT(DISTINCT cnpj_emissor) AS total_emissores,
+  COUNT(DISTINCT CONCAT(
+    COALESCE(CAST(cnpj_emissor AS STRING), ''),
+    '-',
+    COALESCE(CAST(nr_emissao AS STRING), ''),
+    '-',
+    COALESCE(CAST(nr_serie AS STRING), '')
+  )) AS total_cris,
+
+  SUM(vl_saldo) AS total_saldo,
+
+  ARRAY(
+    SELECT AS STRUCT
+      COALESCE(tp_indexador, 'N/A') AS key,
+      COUNT(*) AS n
+    FROM base
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_indexador,
+
+  ARRAY(
+    SELECT AS STRUCT
+      COALESCE(tp_segmento, 'N/A') AS key,
+      COUNT(*) AS n
+    FROM base
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_segmento,
+
+  ARRAY(
+    SELECT AS STRUCT
+      nome_emissor AS key,
+      COUNT(*) AS n
+    FROM base
+    WHERE nome_emissor IS NOT NULL
+    GROUP BY key
+    ORDER BY n DESC
+  ) AS by_emissor,
+
+  CURRENT_TIMESTAMP() AS computed_at
+
+FROM base
