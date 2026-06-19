@@ -2,9 +2,6 @@ config {
   type: "table",
   schema: "gold",
   name: "cri_evolution",
-  bigquery: {
-    partitionBy: "reference_date"
-  },
   assertions: {
     uniqueKey: ["reference_date"],
     nonNull: ["reference_date"]

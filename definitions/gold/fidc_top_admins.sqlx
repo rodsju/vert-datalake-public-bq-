@@ -3,7 +3,6 @@ config {
   schema: "gold",
   name: "fidc_top_admins",
   bigquery: {
-    partitionBy: "reference_date",
     clusterBy: ["rank"]
   },
   assertions: {

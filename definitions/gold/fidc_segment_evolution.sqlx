@@ -3,7 +3,6 @@ config {
   schema: "gold",
   name: "fidc_segment_evolution",
   bigquery: {
-    partitionBy: "reference_date",
     clusterBy: ["segment"]
   },
   assertions: {

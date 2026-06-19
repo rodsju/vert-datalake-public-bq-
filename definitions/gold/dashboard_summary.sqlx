@@ -9,112 +9,137 @@ config {
   tags: ["gold", "gold_dashboard_summary"]
 }
 
+WITH fidc_ranked AS (
+  SELECT
+    reference_date,
+    total_funds,
+    total_pl,
+    ROW_NUMBER() OVER (ORDER BY reference_date DESC) AS rn
+  FROM ${ref("fidc_evolution")}
+  WHERE NOT COALESCE(is_provisional, FALSE)
+),
+
+cra_ranked AS (
+  SELECT
+    reference_date,
+    total_cras,
+    total_saldo,
+    ROW_NUMBER() OVER (ORDER BY reference_date DESC) AS rn
+  FROM ${ref("cra_evolution")}
+  WHERE NOT COALESCE(is_provisional, FALSE)
+),
+
+cri_ranked AS (
+  SELECT
+    reference_date,
+    total_cris,
+    total_saldo,
+    ROW_NUMBER() OVER (ORDER BY reference_date DESC) AS rn
+  FROM ${ref("cri_evolution")}
+  WHERE NOT COALESCE(is_provisional, FALSE)
+),
+
+debenture_ranked AS (
+  SELECT
+    year,
+    offer_count,
+    total_volume,
+    ROW_NUMBER() OVER (ORDER BY year DESC) AS rn
+  FROM ${ref("debenture_evolution")}
+),
+
+metrics AS (
+
+  SELECT
+    'fidc_total_funds' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_funds, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_funds, NULL)) AS NUMERIC) AS previous_value
+  FROM fidc_ranked
+
+  UNION ALL
+
+  SELECT
+    'fidc_total_pl' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_pl, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_pl, NULL)) AS NUMERIC) AS previous_value
+  FROM fidc_ranked
+
+  UNION ALL
+
+  SELECT
+    'cra_total' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_cras, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_cras, NULL)) AS NUMERIC) AS previous_value
+  FROM cra_ranked
+
+  UNION ALL
+
+  SELECT
+    'cra_total_saldo' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_saldo, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_saldo, NULL)) AS NUMERIC) AS previous_value
+  FROM cra_ranked
+
+  UNION ALL
+
+  SELECT
+    'cri_total' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_cris, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_cris, NULL)) AS NUMERIC) AS previous_value
+  FROM cri_ranked
+
+  UNION ALL
+
+  SELECT
+    'cri_total_saldo' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_saldo, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_saldo, NULL)) AS NUMERIC) AS previous_value
+  FROM cri_ranked
+
+  UNION ALL
+
+  SELECT
+    'debenture_total_offers' AS metric_name,
+    CAST(MAX(IF(rn = 1, offer_count, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, offer_count, NULL)) AS NUMERIC) AS previous_value
+  FROM debenture_ranked
+
+  UNION ALL
+
+  SELECT
+    'debenture_total_volume' AS metric_name,
+    CAST(MAX(IF(rn = 1, total_volume, NULL)) AS NUMERIC) AS metric_value,
+    CAST(MAX(IF(rn = 2, total_volume, NULL)) AS NUMERIC) AS previous_value
+  FROM debenture_ranked
+
+  UNION ALL
+
+  SELECT
+    'sre_total_offerings' AS metric_name,
+    CAST(total_offerings AS NUMERIC) AS metric_value,
+    CAST(NULL AS NUMERIC) AS previous_value
+  FROM ${ref("offering_stats")}
+
+  UNION ALL
+
+  SELECT
+    'sre_total_volume' AS metric_name,
+    CAST(total_volume AS NUMERIC) AS metric_value,
+    CAST(NULL AS NUMERIC) AS previous_value
+  FROM ${ref("offering_stats")}
+)
+
 SELECT
   metric_name,
-  CAST(metric_value AS NUMERIC) AS metric_value,
+  metric_value,
   CAST(NULL AS STRING) AS metric_text,
-  CAST(NULL AS NUMERIC) AS previous_value,
-  CAST(NULL AS NUMERIC) AS variation_percent,
+  previous_value,
+
+  SAFE_MULTIPLY(
+    SAFE_DIVIDE(metric_value - previous_value, previous_value),
+    100
+  ) AS variation_percent,
+
   CURRENT_TIMESTAMP() AS computed_at
 
-FROM UNNEST([
-
-  STRUCT(
-    'fidc_total_funds' AS metric_name,
-    (
-      SELECT total_funds
-      FROM ${ref("fidc_evolution")}
-      ORDER BY reference_date DESC
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'fidc_total_pl' AS metric_name,
-    (
-      SELECT total_pl
-      FROM ${ref("fidc_evolution")}
-      ORDER BY reference_date DESC
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'debenture_total_offers' AS metric_name,
-    (
-      SELECT SUM(offer_count)
-      FROM ${ref("debenture_evolution")}
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'debenture_total_volume' AS metric_name,
-    (
-      SELECT SUM(total_volume)
-      FROM ${ref("debenture_evolution")}
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'cra_total' AS metric_name,
-    (
-      SELECT total_cras
-      FROM ${ref("cra_evolution")}
-      WHERE NOT COALESCE(is_provisional, FALSE)
-      ORDER BY reference_date DESC
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'cra_total_saldo' AS metric_name,
-    (
-      SELECT total_saldo
-      FROM ${ref("cra_evolution")}
-      WHERE NOT COALESCE(is_provisional, FALSE)
-      ORDER BY reference_date DESC
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'cri_total' AS metric_name,
-    (
-      SELECT total_cris
-      FROM ${ref("cri_evolution")}
-      WHERE NOT COALESCE(is_provisional, FALSE)
-      ORDER BY reference_date DESC
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'cri_total_saldo' AS metric_name,
-    (
-      SELECT total_saldo
-      FROM ${ref("cri_evolution")}
-      WHERE NOT COALESCE(is_provisional, FALSE)
-      ORDER BY reference_date DESC
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'sre_total_offerings' AS metric_name,
-    (
-      SELECT total_offerings
-      FROM ${ref("offering_stats")}
-      LIMIT 1
-    ) AS metric_value
-  ),
-
-  STRUCT(
-    'sre_total_volume' AS metric_name,
-    (
-      SELECT total_volume
-      FROM ${ref("offering_stats")}
-      LIMIT 1
-    ) AS metric_value
-  )
-
-])
+FROM metrics

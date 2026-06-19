@@ -2,9 +2,7 @@ config {
   type: "table",
   schema: "gold",
   name: "fidc_evolution",
-  bigquery: {
-    partitionBy: "reference_date"
-  },
+
   assertions: {
     uniqueKey: ["reference_date"],
     nonNull: ["reference_date"]
