@@ -5,7 +5,12 @@ const tables = [
         { 
             name: "cvm_fidc_reports",
             mode: "file_incremental",
-            clusterBy: ["cnpj_fundo"],
+            clusterBy: ["cnpj_fundo","reference_date"],
+        },
+        { 
+            name: "cvm_fidc_cotas",
+            mode: "file_incremental",
+            clusterBy: ["cnpj_fundo","reference_date"],
         },
         { 
             name: "cvm_cri_reports",

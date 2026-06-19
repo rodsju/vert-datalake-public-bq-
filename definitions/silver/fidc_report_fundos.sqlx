@@ -1,0 +1,168 @@
+config {
+  type: "table",
+  schema: "silver",
+  name: "fidc_report_fundos",
+  tags: ["silver", "fidc", "cvm_fidc", "silver_fidc_report_fundos"],
+  bigquery: {
+    partitionBy: "DATE_TRUNC(reference_date, MONTH)",
+    clusterBy: ["cnpj_fundo"]
+  }
+}
+
+WITH base AS (
+  SELECT
+    CAST(cnpj_fundo AS STRING) AS cnpj_fundo,
+    CAST(cnpj_classe AS STRING) AS cnpj_classe,
+
+    NULLIF(TRIM(CAST(fund_name AS STRING)), '') AS fund_name,
+    DATE(reference_date) AS reference_date,
+
+    NULLIF(TRIM(CAST(classe AS STRING)), '') AS classe,
+    NULLIF(TRIM(CAST(tipo_fundo_classe AS STRING)), '') AS tipo_fundo_classe,
+
+    SAFE_CAST(patrimonio_liquido AS NUMERIC) AS patrimonio_liquido,
+    SAFE_CAST(valor_cota AS NUMERIC) AS valor_cota,
+    SAFE_CAST(quantidade_cotas AS NUMERIC) AS quantidade_cotas,
+    SAFE_CAST(quantidade_cotistas AS INT64) AS quantidade_cotistas,
+
+    SAFE_CAST(direitos_creditorios AS NUMERIC) AS direitos_creditorios,
+    SAFE_CAST(direitos_credit_vincendos AS NUMERIC) AS direitos_credit_vincendos,
+    SAFE_CAST(direitos_credit_vencidos AS NUMERIC) AS direitos_credit_vencidos,
+    SAFE_CAST(provisao_reducao AS NUMERIC) AS provisao_reducao,
+
+    SAFE_CAST(taxa_administracao AS NUMERIC) AS taxa_administracao,
+    NULLIF(TRIM(CAST(administrador AS STRING)), '') AS administrador,
+    NULLIF(TRIM(CAST(gestor AS STRING)), '') AS gestor,
+    NULLIF(TRIM(CAST(custodiante AS STRING)), '') AS custodiante
+
+  FROM ${ref("fidc_reports")}
+  WHERE cnpj_fundo IS NOT NULL
+    AND reference_date IS NOT NULL
+),
+
+normalizado AS (
+  SELECT
+    *,
+
+    -- Só deduplica Fundo/Classe quando há classe explícita.
+    -- Se classe é NULL, mantém para agregação.
+    UPPER(TRIM(classe)) AS classe_key,
+
+    COALESCE(patrimonio_liquido, 0)
+      + COALESCE(direitos_creditorios, 0)
+      + COALESCE(valor_cota, 0) AS economic_score
+
+  FROM base
+),
+
+marcado AS (
+  SELECT
+    b.*,
+
+    b.tipo_fundo_classe = 'Classe'
+      AND b.classe_key IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM normalizado f
+        WHERE f.reference_date = b.reference_date
+          AND f.cnpj_fundo = b.cnpj_fundo
+          AND f.tipo_fundo_classe = 'Fundo'
+          AND f.classe_key = b.classe_key
+      ) AS descartar_classe_espelho
+
+  FROM normalizado b
+),
+
+filtrado AS (
+  SELECT *
+  FROM marcado
+  WHERE NOT descartar_classe_espelho
+),
+
+agregado AS (
+  SELECT
+    cnpj_fundo,
+    reference_date,
+
+    ARRAY_AGG(fund_name IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS fund_name,
+
+    -- Tabela consolidada em nível fundo.
+    CAST(NULL AS STRING) AS cnpj_classe,
+    CAST(NULL AS STRING) AS classe,
+    'Fundo' AS tipo_fundo_classe,
+
+    -- Quantidade de classes explícitas agregadas.
+    COUNT(DISTINCT classe_key) AS qt_classes,
+
+    -- Campos aditivos.
+    SUM(COALESCE(patrimonio_liquido, 0)) AS patrimonio_liquido,
+    SUM(COALESCE(direitos_creditorios, 0)) AS direitos_creditorios,
+    SUM(COALESCE(direitos_credit_vincendos, 0)) AS direitos_credit_vincendos,
+    SUM(COALESCE(direitos_credit_vencidos, 0)) AS direitos_credit_vencidos,
+    SUM(COALESCE(provisao_reducao, 0)) AS provisao_reducao,
+
+    CASE
+      WHEN COUNTIF(quantidade_cotas IS NOT NULL) > 0
+      THEN SUM(COALESCE(quantidade_cotas, 0))
+      ELSE NULL
+    END AS quantidade_cotas,
+
+    CASE
+      WHEN COUNTIF(quantidade_cotistas IS NOT NULL) > 0
+      THEN SUM(COALESCE(quantidade_cotistas, 0))
+      ELSE NULL
+    END AS quantidade_cotistas,
+
+    -- Campos não aditivos: representante da linha economicamente mais relevante.
+    ARRAY_AGG(valor_cota IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS valor_cota,
+    ARRAY_AGG(taxa_administracao IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS taxa_administracao,
+
+    ARRAY_AGG(administrador IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS administrador,
+    ARRAY_AGG(gestor IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS gestor,
+    ARRAY_AGG(custodiante IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS custodiante,
+
+    -- Auditoria da consolidação.
+    COUNT(*) AS linhas_agregadas_qtd,
+    COUNTIF(tipo_fundo_classe = 'Fundo') AS linhas_fundo_agregadas_qtd,
+    COUNTIF(tipo_fundo_classe = 'Classe') AS linhas_classe_agregadas_qtd,
+
+    CURRENT_TIMESTAMP() AS processed_at
+
+  FROM filtrado
+  GROUP BY
+    cnpj_fundo,
+    reference_date
+),
+
+resumo_origem AS (
+  SELECT
+    cnpj_fundo,
+    reference_date,
+
+    COUNT(*) AS linhas_origem_qtd,
+    COUNTIF(tipo_fundo_classe = 'Fundo') AS linhas_fundo_origem_qtd,
+    COUNTIF(tipo_fundo_classe = 'Classe') AS linhas_classe_origem_qtd,
+    COUNTIF(descartar_classe_espelho) AS linhas_classe_espelho_descartadas_qtd,
+
+    COUNT(DISTINCT classe_key) AS qt_classes_origem,
+    STRING_AGG(DISTINCT tipo_fundo_classe, ', ' ORDER BY tipo_fundo_classe) AS tipos_origem
+
+  FROM marcado
+  GROUP BY
+    cnpj_fundo,
+    reference_date
+)
+
+SELECT
+  a.*,
+
+  r.linhas_origem_qtd,
+  r.linhas_fundo_origem_qtd,
+  r.linhas_classe_origem_qtd,
+  r.linhas_classe_espelho_descartadas_qtd,
+  r.qt_classes_origem,
+  r.tipos_origem
+
+FROM agregado a
+LEFT JOIN resumo_origem r
+  USING (cnpj_fundo, reference_date)
