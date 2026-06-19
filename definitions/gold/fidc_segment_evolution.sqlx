@@ -9,7 +9,7 @@ config {
     uniqueKey: ["reference_date", "segment"],
     nonNull: ["reference_date", "segment"]
   },
-  dependencies: ["fidc_reports"],
+  dependencies: ["fidc_reports_fundos"],
   tags: ["gold", "gold_fidc_segment_evolution"]
 }
 
@@ -24,7 +24,7 @@ SELECT
 
   CURRENT_TIMESTAMP() AS computed_at
 
-FROM ${ref("fidc_reports")}
+FROM ${ref("fidc_reports_fundos")}
 
 WHERE patrimonio_liquido > 0
   AND reference_date IS NOT NULL

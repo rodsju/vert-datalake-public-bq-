@@ -1,8 +1,8 @@
 config {
   type: "table",
   schema: "silver",
-  name: "fidc_report_fundos",
-  tags: ["silver", "fidc", "cvm_fidc", "silver_fidc_report_fundos"],
+  name: "fidc_reports_fundos",
+  tags: ["silver", "fidc", "cvm_fidc", "silver_fidc_reports_fundos"],
   bigquery: {
     partitionBy: "DATE_TRUNC(reference_date, MONTH)",
     clusterBy: ["cnpj_fundo"]

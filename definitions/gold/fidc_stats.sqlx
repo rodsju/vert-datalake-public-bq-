@@ -6,14 +6,14 @@ config {
     uniqueKey: ["reference_date"],
     nonNull: ["reference_date"]
   },
-  dependencies: ["fidc_reports"],
+  dependencies: ["fidc_reports_fundos"],
   tags: ["gold", "gold_fidc_stats"]
 }
 
 WITH latest AS (
   SELECT
     MAX(reference_date) AS reference_date
-  FROM ${ref("fidc_reports")}
+  FROM ${ref("fidc_reports_fundos")}
   WHERE patrimonio_liquido > 0
     AND reference_date IS NOT NULL
 )
@@ -30,7 +30,7 @@ SELECT
 
   CURRENT_TIMESTAMP() AS computed_at
 
-FROM ${ref("fidc_reports")} r
+FROM ${ref("fidc_reports_fundos")} r
 
 JOIN latest l
   ON r.reference_date = l.reference_date

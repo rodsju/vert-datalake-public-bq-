@@ -9,7 +9,7 @@ config {
     uniqueKey: ["reference_date", "administrador"],
     nonNull: ["reference_date", "administrador"]
   },
-  dependencies: ["fidc_reports"],
+  dependencies: ["fidc_reports_fundos"],
   tags: ["gold", "gold_fidc_top_admins"]
 }
 
@@ -23,7 +23,7 @@ WITH admin_agg AS (
     SUM(patrimonio_liquido) AS total_pl,
     AVG(patrimonio_liquido) AS avg_pl
 
-  FROM ${ref("fidc_reports")}
+  FROM ${ref("fidc_reports_fundos")}
 
   WHERE patrimonio_liquido > 0
     AND reference_date IS NOT NULL
