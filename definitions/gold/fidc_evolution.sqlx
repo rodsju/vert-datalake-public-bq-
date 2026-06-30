@@ -17,6 +17,7 @@ SELECT
   COUNT(DISTINCT cnpj_fundo) AS total_funds,
   SUM(patrimonio_liquido) AS total_pl,
   AVG(patrimonio_liquido) AS avg_pl,
+  FALSE as is_provisional,
 
   CURRENT_TIMESTAMP() AS computed_at
 
