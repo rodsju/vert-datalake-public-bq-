@@ -1,5 +1,5 @@
-defaultProject: vert-dev-datalake-public
-defaultLocation: us-central1
+defaultProject: vert-datalake-public-hml-01
+defaultLocation: us-east1
 defaultDataset: logic
 defaultAssertionDataset: logic
 dataformCoreVersion: 3.0.52

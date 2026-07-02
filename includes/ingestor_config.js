@@ -1,4 +1,4 @@
-const BUCKET = "gs://vert-dev-datalake-public-raw";
+const BUCKET = "gs://datalake-public-raw-hml-01";
 const PREFIX = "ingestor";
 
 const tables = [

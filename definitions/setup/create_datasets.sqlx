@@ -1,6 +1,7 @@
 config {
   type: "operations",
-  name: "create_datasets"
+  name: "create_datasets",
+  tags: ["setup", "create_datasets"],
 }
 
 CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.logic`
