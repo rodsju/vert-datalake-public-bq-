@@ -49,13 +49,27 @@ tables.forEach((t) => {
       tags: ["bronze", `bronze_${name}`, `frequency_${frequency}`],
       ...(Object.keys(bigquery).length ? { bigquery } : {}),
     }).query((ctx) => `
+      WITH ext AS (
+        SELECT
+          ${selectStar},
+          REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)__[0-9]{8}T[0-9]{6}Z\\.parquet$') AS file_prefix,
+          REGEXP_EXTRACT(_FILE_NAME, r'__([0-9]{8}T[0-9]{6}Z)\\.parquet$') AS file_timestamp,
+          _FILE_NAME AS _source_gcs_uri,
+          REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file
+        FROM \`${ctx.database()}.bronze_ext.${t.name}_full\`
+      ),
+
+      latest_file AS (
+        SELECT MAX(file_timestamp) AS file_timestamp
+        FROM ext
+        WHERE file_timestamp IS NOT NULL
+      )
+
       SELECT
-        ${selectStar},
-        REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)__[0-9]{8}T[0-9]{6}Z\\.parquet$') AS file_prefix,
-        _FILE_NAME AS _source_gcs_uri,
-        REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file,
+        * EXCEPT(file_timestamp),
         CURRENT_TIMESTAMP() AS _processed_at
-      FROM \`${ctx.database()}.bronze_ext.${t.name}_full\`
+      FROM ext
+      WHERE file_timestamp = (SELECT file_timestamp FROM latest_file)
     `);
 
     return;
@@ -120,7 +134,7 @@ tables.forEach((t) => {
   operate(name)
     .hasOutput(true)
     .schema("bronze")
-    .tags(["bronze", `bronze_${name}`], `frequency_${frequency}`)
+    .tags(["bronze", `bronze_${name}`, `frequency_${frequency}`])
     .dependencies([`register_pending_files_${name}`])
     .queries((ctx) => {
       const renderedDeleteSql = replaceByKeys

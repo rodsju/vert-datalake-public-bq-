@@ -59,7 +59,7 @@ const tables = [
         { 
             name: "cvm_dfin_docs",
             mode: "file_incremental",
-            frequency: "ondemand",
+            frequency: "monthly",
             clusterBy: ["cnpj_emissor","nr_emissao"],
         },
         //{ name: "cvm_fi_docs_eventual" },
