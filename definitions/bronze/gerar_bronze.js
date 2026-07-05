@@ -4,6 +4,7 @@ const { tables } = ingestor_config;
 
 tables.forEach((t) => {
   const name = t.name;
+  const frequency = t.frequency || "never";
   const mode = t.mode || "snapshot";
 
   const exceptColumns = t.exceptColumns || ["raw_data"];
@@ -45,7 +46,7 @@ tables.forEach((t) => {
       schema: "bronze",
       type: "table",
       dependencies: [`${name}_ext`],
-      tags: ["bronze", `bronze_${name}`],
+      tags: ["bronze", `bronze_${name}`, `frequency_${frequency}`],
       ...(Object.keys(bigquery).length ? { bigquery } : {}),
     }).query((ctx) => `
       SELECT
@@ -119,7 +120,7 @@ tables.forEach((t) => {
   operate(name)
     .hasOutput(true)
     .schema("bronze")
-    .tags(["bronze", `bronze_${name}`])
+    .tags(["bronze", `bronze_${name}`], `frequency_${frequency}`)
     .dependencies([`register_pending_files_${name}`])
     .queries((ctx) => {
       const renderedDeleteSql = replaceByKeys
