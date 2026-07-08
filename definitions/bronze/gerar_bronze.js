@@ -40,6 +40,26 @@ tables.forEach((t) => {
    *
    * Recria a bronze inteira sempre.
    * Bom para tabelas pequenas ou snapshots oficiais.
+   * 
+   * -- Padrão esperado para os arquivos Parquet:
+    // -- gs://<bucket>/ingestor/<modelo>/<modelo>__<tipo_carga>__<timestamp>Z.parquet
+    // --
+    // -- Exemplo:
+    // -- gs://datalake-public-raw-hml-01/ingestor/cvm_sre_offerings/cvm_sre_offerings__snapshot__20260708T080044731537Z.parquet
+    // --
+    // -- Onde:
+    // --   <modelo>     = nome lógico da fonte/tabela, ex: cvm_sre_offerings
+    // --   <tipo_carga> = tipo do arquivo, ex: snapshot, full, incremental
+    // --   <timestamp>  = data/hora de geração no formato YYYYMMDDTHHMMSSffffffZ
+    // --
+    // -- Regex compatível:
+    // --   file_prefix    -> r'([^/]+)__[^_]+__[0-9]{8}T[0-9]{6,12}Z\.parquet$'
+    // --   file_type      -> r'__([^_]+)__[0-9]{8}T[0-9]{6,12}Z\.parquet$'
+    // --   file_timestamp -> r'__([0-9]{8}T[0-9]{6,12}Z)\.parquet$'
+    // --
+    // -- Observação:
+    // -- O timestamp deve ficar sempre no final do nome do arquivo, antes de ".parquet",
+    // -- para permitir identificar o arquivo mais recente de forma determinística.
    */
   if (mode === "snapshot") {
     publish(name, {
