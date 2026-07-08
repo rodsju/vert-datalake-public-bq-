@@ -10,7 +10,5 @@ config {
 
 SELECT
   *
-
 FROM ${ref("cvm_fidc_reports")}
-WHERE cnpj_fundo IS NOT NULL
-  AND reference_date IS NOT NULL
+WHERE  reference_date IS NOT NULL
