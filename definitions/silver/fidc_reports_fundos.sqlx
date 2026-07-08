@@ -11,7 +11,9 @@ config {
 
 WITH base AS (
   SELECT
-    CAST(cnpj_fundo AS STRING) AS cnpj_fundo,
+    CAST(COALESCE(cnpj_fundo, cnpj_fundo_classe) AS STRING) AS cnpj_fundo,
+    CAST(cnpj_fundo AS STRING) AS cnpj_fundo_original,
+    CAST(cnpj_fundo_classe AS STRING) AS cnpj_fundo_classe,
     CAST(cnpj_classe AS STRING) AS cnpj_classe,
 
     NULLIF(TRIM(CAST(fund_name AS STRING)), '') AS fund_name,
@@ -36,7 +38,7 @@ WITH base AS (
     NULLIF(TRIM(CAST(custodiante AS STRING)), '') AS custodiante
 
   FROM ${ref("fidc_reports")}
-  WHERE cnpj_fundo IS NOT NULL
+  WHERE COALESCE(cnpj_fundo, cnpj_fundo_classe) IS NOT NULL
     AND reference_date IS NOT NULL
 ),
 
@@ -44,9 +46,8 @@ normalizado AS (
   SELECT
     *,
 
-    -- Só deduplica Fundo/Classe quando há classe explícita.
-    -- Se classe é NULL, mantém para agregação.
     UPPER(TRIM(classe)) AS classe_key,
+    UPPER(TRIM(tipo_fundo_classe)) AS tipo_fundo_classe_key,
 
     COALESCE(patrimonio_liquido, 0)
       + COALESCE(direitos_creditorios, 0)
@@ -59,16 +60,20 @@ marcado AS (
   SELECT
     b.*,
 
-    b.tipo_fundo_classe = 'Classe'
-      AND b.classe_key IS NOT NULL
-      AND EXISTS (
-        SELECT 1
-        FROM normalizado f
-        WHERE f.reference_date = b.reference_date
-          AND f.cnpj_fundo = b.cnpj_fundo
-          AND f.tipo_fundo_classe = 'Fundo'
-          AND f.classe_key = b.classe_key
-      ) AS descartar_classe_espelho
+    CASE
+      WHEN b.tipo_fundo_classe_key = 'CLASSE'
+        AND b.classe_key IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM normalizado f
+          WHERE f.reference_date = b.reference_date
+            AND f.cnpj_fundo = b.cnpj_fundo
+            AND f.tipo_fundo_classe_key = 'FUNDO'
+            AND f.classe_key = b.classe_key
+        )
+      THEN TRUE
+      ELSE FALSE
+    END AS descartar_classe_espelho
 
   FROM normalizado b
 ),
@@ -76,7 +81,7 @@ marcado AS (
 filtrado AS (
   SELECT *
   FROM marcado
-  WHERE NOT descartar_classe_espelho
+  WHERE descartar_classe_espelho = FALSE
 ),
 
 agregado AS (
@@ -86,15 +91,12 @@ agregado AS (
 
     ARRAY_AGG(fund_name IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS fund_name,
 
-    -- Tabela consolidada em nível fundo.
     CAST(NULL AS STRING) AS cnpj_classe,
     CAST(NULL AS STRING) AS classe,
     'Fundo' AS tipo_fundo_classe,
 
-    -- Quantidade de classes explícitas agregadas.
     COUNT(DISTINCT classe_key) AS qt_classes,
 
-    -- Campos aditivos.
     SUM(COALESCE(patrimonio_liquido, 0)) AS patrimonio_liquido,
     SUM(COALESCE(direitos_creditorios, 0)) AS direitos_creditorios,
     SUM(COALESCE(direitos_credit_vincendos, 0)) AS direitos_credit_vincendos,
@@ -113,7 +115,6 @@ agregado AS (
       ELSE NULL
     END AS quantidade_cotistas,
 
-    -- Campos não aditivos: representante da linha economicamente mais relevante.
     ARRAY_AGG(valor_cota IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS valor_cota,
     ARRAY_AGG(taxa_administracao IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS taxa_administracao,
 
@@ -121,10 +122,10 @@ agregado AS (
     ARRAY_AGG(gestor IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS gestor,
     ARRAY_AGG(custodiante IGNORE NULLS ORDER BY economic_score DESC LIMIT 1)[SAFE_OFFSET(0)] AS custodiante,
 
-    -- Auditoria da consolidação.
     COUNT(*) AS linhas_agregadas_qtd,
-    COUNTIF(tipo_fundo_classe = 'Fundo') AS linhas_fundo_agregadas_qtd,
-    COUNTIF(tipo_fundo_classe = 'Classe') AS linhas_classe_agregadas_qtd,
+    COUNTIF(tipo_fundo_classe_key = 'FUNDO') AS linhas_fundo_agregadas_qtd,
+    COUNTIF(tipo_fundo_classe_key = 'CLASSE') AS linhas_classe_agregadas_qtd,
+    COUNTIF(cnpj_fundo_original IS NULL AND cnpj_fundo_classe IS NOT NULL) AS linhas_cnpj_fundo_fallback_qtd,
 
     CURRENT_TIMESTAMP() AS processed_at
 
@@ -140,9 +141,10 @@ resumo_origem AS (
     reference_date,
 
     COUNT(*) AS linhas_origem_qtd,
-    COUNTIF(tipo_fundo_classe = 'Fundo') AS linhas_fundo_origem_qtd,
-    COUNTIF(tipo_fundo_classe = 'Classe') AS linhas_classe_origem_qtd,
+    COUNTIF(tipo_fundo_classe_key = 'FUNDO') AS linhas_fundo_origem_qtd,
+    COUNTIF(tipo_fundo_classe_key = 'CLASSE') AS linhas_classe_origem_qtd,
     COUNTIF(descartar_classe_espelho) AS linhas_classe_espelho_descartadas_qtd,
+    COUNTIF(cnpj_fundo_original IS NULL AND cnpj_fundo_classe IS NOT NULL) AS linhas_cnpj_fundo_fallback_origem_qtd,
 
     COUNT(DISTINCT classe_key) AS qt_classes_origem,
     STRING_AGG(DISTINCT tipo_fundo_classe, ', ' ORDER BY tipo_fundo_classe) AS tipos_origem
@@ -160,6 +162,7 @@ SELECT
   r.linhas_fundo_origem_qtd,
   r.linhas_classe_origem_qtd,
   r.linhas_classe_espelho_descartadas_qtd,
+  r.linhas_cnpj_fundo_fallback_origem_qtd,
   r.qt_classes_origem,
   r.tipos_origem
 
