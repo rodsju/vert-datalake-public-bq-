@@ -52,8 +52,14 @@ tables.forEach((t) => {
       WITH ext AS (
         SELECT
           ${selectStar},
-          REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)__[0-9]{8}T[0-9]{6}Z\\.parquet$') AS file_prefix,
-          REGEXP_EXTRACT(_FILE_NAME, r'__([0-9]{8}T[0-9]{6}Z)\\.parquet$') AS file_timestamp,
+          REGEXP_EXTRACT(
+              _FILE_NAME,
+              r'([^/]+)__[^_]+__[0-9]{8}T[0-9]{6,12}Z\.parquet$'
+            ) AS file_prefix,
+          REGEXP_EXTRACT(
+              _FILE_NAME,
+              r'__([0-9]{8}T[0-9]{6,12}Z)\.parquet$'
+            ) AS file_timestamp,
           _FILE_NAME AS _source_gcs_uri,
           REGEXP_EXTRACT(_FILE_NAME, r'([^/]+)$') AS _source_file
         FROM \`${ctx.database()}.bronze_ext.${t.name}_full\`
