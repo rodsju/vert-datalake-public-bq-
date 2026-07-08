@@ -9,6 +9,7 @@ config {
 }
 
 SELECT
+CAST(COALESCE(cnpj_fundo, cnpj_fundo_classe) AS STRING) AS cnpj_fundo,
   *
 FROM ${ref("cvm_fidc_reports")}
 WHERE  reference_date IS NOT NULL
