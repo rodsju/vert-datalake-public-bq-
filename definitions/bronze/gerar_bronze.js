@@ -66,7 +66,7 @@ tables.forEach((t) => {
       schema: "bronze",
       type: "table",
       dependencies: [`${name}_ext`],
-      tags: ["bronze", `bronze_${name}`, `frequency_${frequency}`],
+      tags: ["bronze", `bronze_${name}`, `frequency_${frequency}`, `bronze_mode_${mode}`],
       ...(Object.keys(bigquery).length ? { bigquery } : {}),
     }).query((ctx) => `
       WITH ext AS (
@@ -160,7 +160,7 @@ tables.forEach((t) => {
   operate(name)
     .hasOutput(true)
     .schema("bronze")
-    .tags(["bronze", `bronze_${name}`, `frequency_${frequency}`])
+    .tags(["bronze", `bronze_${name}`, `frequency_${frequency}`, `bronze_mode_${mode}`])
     .dependencies([`register_pending_files_${name}`])
     .queries((ctx) => {
       const renderedDeleteSql = replaceByKeys
